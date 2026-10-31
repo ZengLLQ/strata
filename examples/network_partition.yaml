@@ -1,0 +1,89 @@
+schema_version: "1.0.0"
+
+metadata:
+  id: "exp_network_partition_and_recovery"
+  name: "Three-Node Cluster with Network Partition & Message Drop Anomaly"
+  version: "1.0.0"
+  description: >
+    Demonstrates network partition fault injection and isolation. A 3-node cluster
+    undergoes a bilateral partition between {node-1, node-2} and {node-3} at t=15ms,
+    healing at t=50ms. Validates partition isolation and fault observation.
+  tags:
+    - "partition"
+    - "split-brain"
+    - "healing"
+    - "replicated-kv"
+
+execution:
+  mode: "simulation"
+  seed: 99
+  deterministic: true
+
+topology:
+  nodes:
+    - id: "node-1"
+      role: "coordinator"
+      initial_state: "online"
+    - id: "node-2"
+      role: "replica"
+      initial_state: "online"
+    - id: "node-3"
+      role: "replica"
+      initial_state: "online"
+  network:
+    default_latency_us: 1000
+    default_jitter_us: 0
+    default_drop_rate: 0.0
+
+workload:
+  workload_type: "replicated_kv"
+  operations_count: 8
+  arrival_interval_us: 8000  # Operations arrive every 8ms
+  key_space_size: 4
+  target_nodes:
+    - "node-1"
+
+faults:
+  - id: "partition_node_3"
+    fault_type: "network_partition"
+    target: "network"
+    trigger_time_us: 15000     # Partition starts at t=15ms
+    duration_us: 35000         # Partition heals at t=50ms
+    parameters:
+      group_a:
+        - "node-1"
+        - "node-2"
+      group_b:
+        - "node-3"
+
+  - id: "drop_replications_node_2"
+    fault_type: "message_drop"
+    target: "node-2"
+    trigger_time_us: 55000
+    duration_us: 10000
+    parameters:
+      source: "node-1"
+      message_type: "replicate_request"
+
+invariants:
+  - id: "inv_partition_check"
+    invariant_type: "partition_isolation"
+    description: "Verify no communication crossed partition boundary during partition window"
+
+  - id: "inv_faults_observed"
+    invariant_type: "fault_observed"
+    description: "Verify all scheduled network faults were applied"
+
+  - id: "inv_panic_free"
+    invariant_type: "no_panic"
+    description: "Verify clean execution without unhandled errors"
+
+limits:
+  max_virtual_time_us: 500000
+  max_events: 10000
+  wall_clock_timeout_seconds: 15.0
+
+artifacts:
+  output_dir: "./artifacts"
+  persist_sqlite: true
+  persist_jsonl: true

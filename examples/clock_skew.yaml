@@ -1,0 +1,75 @@
+schema_version: "1.0.0"
+
+metadata:
+  id: "exp_clock_skew_drift"
+  name: "Three-Node Cluster with Simulated Clock Skew and Recovery"
+  version: "1.0.0"
+  description: >
+    Demonstrates clock skew fault injection. Node-2 experiences a +25ms clock
+    offset starting at t=10ms and lasting for 30ms before recovering.
+  tags:
+    - "clock-skew"
+    - "temporal"
+    - "replicated-kv"
+
+execution:
+  mode: "simulation"
+  seed: 42
+  deterministic: true
+
+topology:
+  nodes:
+    - id: "node-1"
+      role: "coordinator"
+      initial_state: "online"
+    - id: "node-2"
+      role: "replica"
+      initial_state: "online"
+    - id: "node-3"
+      role: "replica"
+      initial_state: "online"
+  network:
+    default_latency_us: 1000
+    default_jitter_us: 0
+    default_drop_rate: 0.0
+
+workload:
+  workload_type: "replicated_kv"
+  operations_count: 6
+  arrival_interval_us: 5000
+  key_space_size: 3
+  target_nodes:
+    - "node-1"
+
+faults:
+  - id: "skew_node_2"
+    fault_type: "clock_skew"
+    target: "node-2"
+    trigger_time_us: 10000
+    duration_us: 30000
+    parameters:
+      offset_us: 25000
+      drift_ppm: 5000
+
+invariants:
+  - id: "inv_conv"
+    invariant_type: "state_convergence"
+    description: "Verify replica state convergence across all nodes"
+
+  - id: "inv_faults_observed"
+    invariant_type: "fault_observed"
+    description: "Verify clock skew fault was applied"
+
+  - id: "inv_panic_free"
+    invariant_type: "no_panic"
+    description: "Verify clean execution without unhandled panics"
+
+limits:
+  max_virtual_time_us: 500000
+  max_events: 10000
+  wall_clock_timeout_seconds: 15.0
+
+artifacts:
+  output_dir: "./artifacts"
+  persist_sqlite: true
+  persist_jsonl: true

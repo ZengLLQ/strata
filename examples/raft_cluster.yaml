@@ -1,0 +1,82 @@
+schema_version: "1.0.0"
+
+metadata:
+  id: "raft_consensus_demo"
+  name: "Three-Node Raft Consensus Cluster with Failover and Linearizability"
+  version: "1.0.0"
+  description: "Raft consensus cluster in deterministic simulation with leader election, log replication, crash failover, and formal linearizability verification."
+  tags:
+    - "consensus"
+    - "raft"
+    - "linearizability"
+    - "simulation"
+
+execution:
+  mode: "simulation"
+  seed: 100
+  deterministic: true
+
+topology:
+  nodes:
+    - id: "node-1"
+      role: "raft_node"
+      initial_state: "online"
+      parameters:
+        election_timeout_us: 40000
+        heartbeat_interval_us: 15000
+    - id: "node-2"
+      role: "raft_node"
+      initial_state: "online"
+      parameters:
+        election_timeout_us: 70000
+        heartbeat_interval_us: 15000
+    - id: "node-3"
+      role: "raft_node"
+      initial_state: "online"
+      parameters:
+        election_timeout_us: 100000
+        heartbeat_interval_us: 15000
+
+  network:
+    default_latency_us: 1000
+    default_jitter_us: 0
+    default_drop_rate: 0.0
+
+workload:
+  workload_type: "raft_kv"
+  operations_count: 5
+  arrival_interval_us: 30000
+  key_space_size: 2
+  target_nodes:
+    - "node-1"
+
+faults:
+  - id: "crash_leader_node_1"
+    fault_type: "node_crash"
+    target: "node-1"
+    trigger_time_us: 80000
+    duration_us: 50000
+
+invariants:
+  - id: "inv_linearizability"
+    invariant_type: "linearizability"
+    description: "Verify that all client key-value operations satisfy strict linearizability against sequential specification"
+  - id: "inv_state_convergence"
+    invariant_type: "state_convergence"
+    description: "Verify that all surviving online cluster nodes converge to identical replicated state"
+  - id: "inv_fault_observed"
+    invariant_type: "fault_observed"
+    description: "Verify that the scheduled leader crash fault was dispatched and applied"
+  - id: "inv_no_panic"
+    invariant_type: "no_panic"
+    description: "Verify that the Raft cluster executed without unhandled internal exceptions"
+
+limits:
+  max_virtual_time_us: 5000000
+  max_events: 50000
+  wall_clock_timeout_seconds: 15.0
+
+artifacts:
+  output_dir: "./artifacts"
+  persist_sqlite: true
+  persist_jsonl: true

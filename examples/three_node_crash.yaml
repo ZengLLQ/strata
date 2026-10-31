@@ -1,0 +1,71 @@
+schema_version: "1.0.0"
+
+metadata:
+  id: "exp_three_node_crash_recovery"
+  name: "Three-Node Cluster with Intermediate Node Crash & Recovery"
+  version: "1.0.0"
+  description: >
+    Demonstrates deterministic discrete-event simulation across a 3-node replicated
+    cluster. A workload of replicated key-value writes is applied while node-2 undergoes
+    a scheduled crash at t=25ms followed by an automatic recovery at t=70ms. Evaluates
+    state convergence, fault observation, and clean panic-free execution.
+  tags:
+    - "three-node"
+    - "crash-fault"
+    - "recovery"
+    - "replicated-kv"
+
+execution:
+  mode: "simulation"
+  seed: 42
+  deterministic: true
+
+topology:
+  nodes:
+    - id: "node-1"
+      role: "coordinator"
+      initial_state: "online"
+    - id: "node-2"
+      role: "replica"
+      initial_state: "online"
+    - id: "node-3"
+      role: "replica"
+      initial_state: "online"
+  network:
+    default_latency_us: 1000  # 1 millisecond one-way latency
+    default_jitter_us: 0      # Zero jitter for strict timing determinism
+    default_drop_rate: 0.0
+
+workload:
+  workload_type: "replicated_kv"
+  operations_count: 10
+  arrival_interval_us: 10000  # 10 milliseconds between operations
+  key_space_size: 3
+  target_nodes:
+    - "node-1"
+
+faults:
+  - id: "fault_crash_node_2"
+    fault_type: "node_crash"
+    target: "node-2"
+    trigger_time_us: 25000    # Crash at t=25ms
+    duration_us: 45000        # Recover at t=70ms (duration=45ms)
+
+invariants:
+  - id: "inv_fault_audit"
+    invariant_type: "fault_observed"
+    description: "Verify that node-2 crash fault was scheduled and applied"
+
+  - id: "inv_panic_free"
+    invariant_type: "no_panic"
+    description: "Verify simulation completed without unhandled exceptions"
+
+limits:
+  max_virtual_time_us: 500000  # 500 milliseconds virtual time limit
+  max_events: 10000
+  wall_clock_timeout_seconds: 10.0
+
+artifacts:
+  output_dir: "./artifacts"
+  persist_sqlite: true
+  persist_jsonl: true
