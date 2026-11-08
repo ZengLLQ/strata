@@ -47,3 +47,7 @@ class BaseFault:
         """Record failure during fault application."""
         self._phase = FaultPhase.FAILED
         self.execution_evidence = {"error": error_message}
+
+    def apply(self, engine: Any, now_us: VirtualMicroseconds) -> dict[str, Any]:
+        """Apply failure mechanism to target via the simulation engine."""
+        raise NotImplementedError("Subclasses must implement apply()")

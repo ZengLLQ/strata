@@ -154,6 +154,12 @@ class ExperimentDefinition(StrictBaseModel):
     @model_validator(mode="after")
     def validate_cross_field_references(self) -> ExperimentDefinition:
         """Verify that all node references across faults and workloads exist in topology."""
+        if self.execution.mode == ExecutionMode.INTEGRATION and self.execution.deterministic:
+            raise ValueError(
+                "Real-system integration mode cannot provide deterministic guarantees. "
+                "Set 'deterministic: false' in execution configuration."
+            )
+
         valid_node_ids = {node.id for node in self.topology.nodes}
 
         # Check fault targets

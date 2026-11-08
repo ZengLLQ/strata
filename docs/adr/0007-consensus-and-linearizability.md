@@ -7,7 +7,7 @@ Accepted
 Early phases of Strata provided simple master-replica key-value replication. However, modern distributed systems research and portfolio-grade engineering require:
 1. **Real Distributed Consensus**: Multi-node consensus with leader election, terms, heartbeats, and log replication based on the Raft protocol (Ongaro & Ousterhout, 2014).
 2. **Formal Linearizability Verification**: Per the master engineering specification:
-    > *"Do not label a system linearizable merely because all nodes eventually contain the same value. If a linearizability checker is implemented, define the history format and validate histories against an explicit sequential specification."*
+   > *"Do not label a system linearizable merely because all nodes eventually contain the same value. If a linearizability checker is implemented, define the history format and validate histories against an explicit sequential specification."*
 
 ## Decisions
 

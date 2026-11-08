@@ -11,45 +11,48 @@ from strata.simulation.events import BaseEvent
 
 
 class PriorityEventQueue:
-    """Deterministic min-heap priority queue for discrete events.
+    """Deterministic event queue using a min-heap with an explicit 3-tuple total order key:
     
-    Total ordering contract:
-    1. Virtual timestamp (timestamp_us): earlier events execute first.
-    2. Priority tier (priority): lower integer values take precedence at identical times.
-    3. Sequence ID (sequence_id): monotonic arrival ID breaks ties deterministically.
+    (timestamp_us, priority, sequence_id).
     
-    Heap element: (timestamp_us, priority_int, sequence_id, event)
+    This guarantees that events with identical timestamps and priorities are dispatched
+    in the deterministic order of their creation (sequence_id), eliminating non-deterministic
+    tie-breaking drift.
     """
 
     def __init__(self) -> None:
-        self._heap: list[tuple[VirtualMicroseconds, int, EventSequenceId, BaseEvent]] = []
+        # Heap elements: (timestamp_us, priority, sequence_id, event)
+        self._heap: list[tuple[VirtualMicroseconds, EventPriority, EventSequenceId, BaseEvent]] = []
+        self._last_popped_time: VirtualMicroseconds = 0
 
     def push(self, event: BaseEvent) -> None:
-        """Push an event into the deterministic queue."""
-        heap_item = (
-            event.timestamp_us,
-            int(event.priority),
-            event.sequence_id,
-            event,
-        )
-        heapq.heappush(self._heap, heap_item)
+        """Add an event to the priority queue."""
+        entry = (event.timestamp_us, event.priority, event.sequence_id, event)
+        heapq.heappush(self._heap, entry)
 
     def pop(self) -> BaseEvent:
-        """Pop and return the next event according to total ordering."""
+        """Pop and return the earliest scheduled event according to the total ordering contract.
+        
+        Raises IndexError if the queue is empty.
+        Raises SimulationError if an event with a retrogressive timestamp is encountered.
+        """
         if not self._heap:
-            raise SimulationError("Cannot pop from an empty priority event queue.")
-        _, _, _, event = heapq.heappop(self._heap)
+            raise IndexError("pop from empty event queue")
+        
+        timestamp_us, _, _, event = heapq.heappop(self._heap)
+        if timestamp_us < self._last_popped_time:
+            raise SimulationError(
+                f"Scheduler contract violation: popped event with timestamp {timestamp_us}us "
+                f"which is earlier than previous event timestamp {self._last_popped_time}us"
+            )
+        self._last_popped_time = timestamp_us
         return event
 
     def peek(self) -> BaseEvent | None:
-        """Return the next event without removing it, or None if empty."""
+        """Inspect the next event without removing it, or return None if empty."""
         if not self._heap:
             return None
         return self._heap[0][3]
-
-    def clear(self) -> None:
-        """Clear all events from the queue."""
-        self._heap.clear()
 
     def __len__(self) -> int:
         return len(self._heap)
@@ -57,8 +60,12 @@ class PriorityEventQueue:
     def __bool__(self) -> bool:
         return bool(self._heap)
 
+    def clear(self) -> None:
+        """Clear all pending events."""
+        self._heap.clear()
+        self._last_popped_time = 0
+
     def __iter__(self) -> Iterator[BaseEvent]:
-        # Return events ordered by popping a copy of the heap
-        copy_heap = list(self._heap)
-        while copy_heap:
-            yield heapq.heappop(copy_heap)[3]
+        """Iterate over all remaining events in priority order (consuming the queue)."""
+        while self:
+            yield self.pop()
